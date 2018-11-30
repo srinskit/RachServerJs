@@ -1,4 +1,4 @@
 */test*
 RachPy/__pycache__
-RachPy/.idea
-
+*/.idea
+*/node_modules/

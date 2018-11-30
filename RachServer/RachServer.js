@@ -104,20 +104,20 @@ class Tree {
     }
 }
 
-class SocketClient {
+class RachClient {
     constructor(id, ws) {
         this.id = id;
         this.ws = ws;
         if (this.id === '-1')
             return;
         this.ws.on('message', (msg) => {
-            SocketClient.actions['onMessage'](this, msg);
+            RachClient.actions['onMessage'](this, msg);
         });
         this.ws.on('close', () => {
-            SocketClient.actions['onClose'](this);
+            RachClient.actions['onClose'](this);
         });
         this.ws.on('error', (err) => {
-            SocketClient.actions['onError'](this, err);
+            RachClient.actions['onError'](this, err);
         });
     }
 
@@ -127,17 +127,17 @@ class SocketClient {
             this.ws.send(msg, callback);
         } catch (err) {
             // console.error(err);
-            // SocketClient.actions['removeClient'](this);
+            // RachClient.actions['removeClient'](this);
         }
     }
 }
 
-class SocketServer {
+class RachServer {
 
     constructor(actions, logger) {
         this.actions = actions;
         this.logger = logger;
-        SocketClient.actions = {
+        RachClient.actions = {
             onMessage: (client, msg) => this.onMessage(client, msg),
             onClose: (client) => this.onClose(client),
             onError: (client, err) => this.onError(client, err),
@@ -155,11 +155,11 @@ class SocketServer {
             port: 8080
         });
         this.wss.on('connection', (ws, req) => this.onConnectionCallback(ws, req));
-        this.logger.info('Starting SocketServer');
+        this.logger.info('Starting RachServer');
     }
 
     stop() {
-        this.logger.info('Stopping SocketServer');
+        this.logger.info('Stopping RachServer');
         this.wss.close();
     }
 
@@ -175,11 +175,10 @@ class SocketServer {
             let id = uuid_v1();
             let msg = {type: 'auth', verbose: 'Passed auth test', data: {success: true, id: id}};
             this.logger.info(msg.verbose);
-            let client = new SocketClient(id, ws);
+            let client = new RachClient(id, ws);
             client.send(JSON.stringify(msg));
             this.clients[id] = client;
-        }
-        else {
+        } else {
             let msg = {type: 'auth', verbose: 'Failed auth test', data: {success: false}};
             this.logger.warn(msg.verbose);
             ws.send(JSON.stringify(msg));
@@ -190,15 +189,13 @@ class SocketServer {
     onMessage(client, msg) {
         try {
             msg = JSON.parse(msg);
-        }
-        catch (e) {
+        } catch (e) {
             client.send(JSON.stringify({type: 'err', verbose: 'Invalid JSON received'}));
             return;
         }
         if ('matcher' in msg && 'type' in msg && 'data' in msg) {
             this.process(client, msg);
-        }
-        else {
+        } else {
             client.send(JSON.stringify({type: 'err', verbose: 'Invalid msg'}));
         }
     }
@@ -235,13 +232,11 @@ class SocketServer {
                                 };
                                 client.send(JSON.stringify(res));
                             }].concat(req.data.args));
-                    }
-                    else {
+                    } else {
                         let res = {matcher: req.matcher, type: 'err', verbose: 'Service unavailable'};
                         client.send(JSON.stringify(res));
                     }
-                }
-                else {
+                } else {
                     let res = {matcher: req.matcher, type: 'err', verbose: 'Service topic missing'};
                     client.send(JSON.stringify(res));
                 }
@@ -254,14 +249,12 @@ class SocketServer {
                         if (err) {
                             let res = {matcher: req.matcher, type: 'err', verbose: 'Addition of subscription failed'};
                             client.send(JSON.stringify(res));
-                        }
-                        else {
+                        } else {
                             let res = {matcher: req.matcher, type: 'ack', verbose: 'Added subscription'};
                             client.send(JSON.stringify(res));
                         }
                     });
-                }
-                else {
+                } else {
                     let res = {matcher: req.matcher, type: 'err', verbose: 'Addition of subscription failed'};
                     client.send(JSON.stringify(res));
                 }
@@ -274,14 +267,12 @@ class SocketServer {
                         if (err) {
                             let res = {matcher: req.matcher, type: 'err', verbose: 'Removal of subscription failed'};
                             client.send(JSON.stringify(res));
-                        }
-                        else {
+                        } else {
                             let res = {matcher: req.matcher, type: 'ack', verbose: 'Removed subscription'};
                             client.send(JSON.stringify(res));
                         }
                     });
-                }
-                else {
+                } else {
                     let res = {matcher: req.matcher, type: 'err', verbose: 'Removal of subscription failed'};
                     client.send(JSON.stringify(res));
                 }
@@ -294,14 +285,12 @@ class SocketServer {
                         if (err) {
                             let res = {matcher: req.matcher, type: 'err', verbose: 'Addition of publication failed'};
                             client.send(JSON.stringify(res));
-                        }
-                        else {
+                        } else {
                             let res = {matcher: req.matcher, type: 'ack', verbose: 'Added publication'};
                             client.send(JSON.stringify(res));
                         }
                     });
-                }
-                else {
+                } else {
                     let res = {matcher: req.matcher, type: 'err', verbose: 'Addition of publication failed'};
                     client.send(JSON.stringify(res));
                 }
@@ -314,14 +303,12 @@ class SocketServer {
                         if (err) {
                             let res = {matcher: req.matcher, type: 'err', verbose: 'Removal of publication failed'};
                             client.send(JSON.stringify(res));
-                        }
-                        else {
+                        } else {
                             let res = {matcher: req.matcher, type: 'ack', verbose: 'Removed publication'};
                             client.send(JSON.stringify(res));
                         }
                     });
-                }
-                else {
+                } else {
                     let res = {matcher: req.matcher, type: 'err', verbose: 'Removal of publication failed'};
                     client.send(JSON.stringify(res));
                 }
@@ -342,8 +329,7 @@ class SocketServer {
                         this.clients[id].send(JSON.stringify(res));
                     });
 
-                }
-                else {
+                } else {
                     let res = {matcher: req.matcher, type: 'err', verbose: 'Publish failed'};
                     client.send(JSON.stringify(res));
                 }
@@ -365,13 +351,13 @@ class SocketServer {
     }
 
     addSub(topic, cb, args) {
-        topic = SocketServer.format_topic(topic);
+        topic = RachServer.format_topic(topic);
         this.local_callbacks[topic] = [cb, args];
         this.process(this.local_client, {data: {topic: topic}, matcher: '0', type: 'addSub'});
     }
 
     rmSub(topic) {
-        topic = SocketServer.format_topic(topic);
+        topic = RachServer.format_topic(topic);
         this.process(this.local_client, {data: {topic: topic}, matcher: '0', type: 'rmSub'});
         delete this.local_callbacks[topic];
     }
@@ -385,12 +371,12 @@ class SocketServer {
     }
 
     pub(topic, data) {
-        topic = SocketServer.format_topic(topic);
+        topic = RachServer.format_topic(topic);
         this.process(this.local_client, {data: {topic: topic, data: data}, matcher: '0', type: 'pub'});
     }
 
     makeLocalClient() {
-        return new SocketClient('-1', {
+        return new RachClient('-1', {
             send: (msg, cb) => {
                 let req = JSON.parse(msg);
                 if (cb != null)
@@ -411,4 +397,4 @@ class SocketServer {
     }
 }
 
-module.exports = SocketServer;
+module.exports = RachServer;
