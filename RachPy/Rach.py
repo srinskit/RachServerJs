@@ -206,13 +206,25 @@ class Rach:
         elif typ == 'err':
             if matcher is not None and matcher in self.request_map:
                 _, _, cb, args = self.request_map.pop(matcher)
-                cb(*args)
+                err_msg = msg.get('verbose')
+                if args is not None:
+                    cb(*([err_msg] + args))
+                else:
+                    cb(err_msg)
         elif typ == 'ack':
             if matcher is not None and matcher in self.request_map:
                 cb, args, _, _ = self.request_map.pop(matcher)
                 cb(*args)
         elif typ == 'pub':
             self.process_pub(msg.get('data', None))
+        elif typ == 'service':
+            if matcher is not None and matcher in self.request_map:
+                data = msg.get('data')
+                cb, args, _, _ = self.request_map.pop(matcher)
+                if data is not None:
+                    cb(*([data] + args))
+                else:
+                    cb(*args)
 
     def sock_manager(self):
         """Maintain socket connection
@@ -426,3 +438,28 @@ class Rach:
         """
         for topic in self.pub_topics:
             self.rm_pub(topic)
+
+    def service_call(self, topic, args, on_result, on_result_args, on_err, on_err_args):
+        """Call a service
+
+            Parameters:
+                topic (str): The service topic
+                args (list): The service arguments
+                on_result (function): The callback to call when service call returns
+                on_result_args (list): The parameters to pass to on_result
+                on_err (function): The callback to call when service call throws exception
+                on_err_args (list): The parameters to pass to on_err
+        """
+        matcher = self.make_req_matcher()
+        msg = {
+            'type': 'service',
+            'matcher': matcher,
+            'data': {
+                'topic': topic,
+                'args': args,
+            }
+        }
+        self.request_map[matcher] = [
+            on_result, on_result_args, on_err, on_err_args
+        ]
+        self.send(msg)
