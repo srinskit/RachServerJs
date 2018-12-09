@@ -232,10 +232,12 @@ class RachServer {
     /**
      * Create a Rach Server
      * @param {object} actions - The map mapping actions to callbacks
+     * @param {object} services - The map mapping services to callbacks
      * @param {object} logger - The logger instance to be used for logging
      */
-    constructor(actions, logger) {
+    constructor(actions, services, logger) {
         this.actions = actions;
+        this.services = services;
         this.logger = logger;
         RachClient.actions = {
             onMessage: (client, msg) => this.onMessage(client, msg),
@@ -244,7 +246,6 @@ class RachServer {
         };
         this.wss = null;
         this.tree = new Tree();
-        this.services = actions['services'];
         this.local_callbacks = {};
         this.local_client = this.makeLocalClient();
         this.clients = {[this.local_client.id]: this.local_client};
@@ -489,7 +490,7 @@ class RachServer {
      * Add a local subscriber
      * @param {string} topic - The topic to subscribe to
      * @param {function} callback - The callback to call when event occurs at subscribed topic
-     * @param {list} args - The arguments to pass to callback in addition to event data
+     * @param {Array} args - The arguments to pass to callback in addition to event data
      */
     addSub(topic, callback, args) {
         topic = RachServer.format_topic(topic);

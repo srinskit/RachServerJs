@@ -112,10 +112,7 @@ class Rach {
                 delete this.request_map[matcher];
                 let cb = tmp[0];
                 let args = tmp[1];
-                if (msg.data && msg.data.result)
-                    cb.apply(null, [msg.data.result].concat(args));
-                else
-                    cb.apply(null, args);
+                cb.apply(null, [msg.data].concat(args));
             }
         }
     }
