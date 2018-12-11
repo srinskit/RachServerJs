@@ -1,10 +1,17 @@
+/** @module Rach */
+
+/** Class representing Rach client */
 class Rach {
+    /**
+     * Create Rach client
+     * @param {string} path - The URL of Rach Server
+     * @param {object} cred - The credentials used for authentication
+     */
     constructor(path, cred) {
         this.sock = null;
         this.cred = cred;
         this.server_path = path;
         this.debug = false;
-        this.killed = false;
         this.ns = '/';
         this.matcher = 0;
         this.callbacks = {};
@@ -13,12 +20,20 @@ class Rach {
         this.sub_topics = {};
     }
 
+    /**
+     * Add parameters to the Rach Server path
+     * @param {string} path - The URL of Rach Server
+     * @param {object} cred - The credentials used for authentication
+     * @return {string} The parameterized path to Rach Server
+     */
     static prep_path(path, cred) {
         return path + `?type=${cred['type']}&username=${cred['username']}&password=${cred['password']}`;
     }
 
+    /**
+     * Connect to the Rach Server
+     */
     start() {
-        this.killed = false;
         let path = Rach.prep_path(this.server_path, this.cred);
         this.sock = new WebSocket(path);
         this.sock.onopen = (event) => this.ws_on_open(event);
@@ -27,6 +42,9 @@ class Rach {
         this.sock.onclose = (event) => this.ws_on_close(event);
     }
 
+    /**
+     * Disconnect from the Rach Server
+     */
     stop() {
         this.killed = true;
         this.rm_all_sub();
@@ -35,16 +53,28 @@ class Rach {
             this.sock.close();
     }
 
+    /**
+     * Send msg to Rach Server
+     * @param {object} msg - The message to send
+     */
     send(msg) {
         let str_msg = JSON.stringify(msg);
         this.log('ws send msg: ' + str_msg);
         this.sock.send(str_msg);
     }
 
+    /**
+     * Callback to handle websocket connection open
+     * @param {object} event - The websocket event
+     */
     ws_on_open(event) {
         this.log('ws opened');
     }
 
+    /**
+     * Callback to handle message from websocket
+     * @param {object} event - The websocket event
+     */
     ws_on_message(event) {
         let str_msg = event.data;
         try {
@@ -56,27 +86,49 @@ class Rach {
         }
     }
 
+    /**
+     * Callback to handle websocket error
+     * @param {object} event - The websocket event
+     */
     ws_on_error(event) {
         this.log('ws error');
     }
 
+    /**
+     * Callback to handle websocket close
+     * @param {object} event - The websocket event
+     */
     ws_on_close(event) {
         this.log('ws closed');
     }
 
+    /**
+     * Print debug messages
+     * @param {string} msg - The debug message
+     */
     log(msg) {
         if (this.debug)
             console.log(msg);
     }
 
+    /**
+     * Enable printing of debug messages
+     */
     enable_debug() {
         this.debug = true;
     }
 
+    /**
+     * Disable printing of debug messages
+     */
     disable_debug() {
         this.debug = false;
     }
 
+    /**
+     * Process received message
+     * @param {object} msg - Process received message
+     */
     process_msg(msg) {
         let typ = msg.type;
         let matcher = msg.matcher;
@@ -94,7 +146,12 @@ class Rach {
                 delete this.request_map[matcher];
                 let cb = tmp[2];
                 let args = tmp[3];
-                cb.apply(null, args);
+                let err_msg = msg['verbose'];
+                if (args != null) {
+                    cb.apply(null, [err_msg].concat(args));
+                } else {
+                    cb(err_msg);
+                }
             }
         } else if (typ === 'ack') {
             if (matcher != null && matcher in this.request_map) {
@@ -108,25 +165,33 @@ class Rach {
             this.process_pub(msg.data || null);
         } else if (typ === 'service') {
             if (matcher != null && matcher in this.request_map) {
+                let data = msg['data'];
                 let tmp = this.request_map[matcher];
                 delete this.request_map[matcher];
                 let cb = tmp[0];
                 let args = tmp[1];
-                cb.apply(null, [msg.data].concat(args));
+                if (data != null) {
+                    cb.apply(null, [data].concat(args));
+                } else {
+                    cb.apply(null, args);
+                }
             }
         }
     }
 
-
-    sock_manager() {
-
-    }
-
+    /**
+     * Generate unique string every call
+     * @return (string) The unique string
+     */
     make_req_matcher() {
         this.matcher += 1;
         return String(this.matcher);
     }
 
+    /**
+     * Set namespace of Rach Client
+     * @param {string} ns - The namespace
+     */
     set_namespace(ns) {
         if (ns[ns.length - 1] !== '/')
             this.ns = ns + '/';
@@ -134,6 +199,10 @@ class Rach {
             this.ns = ns;
     }
 
+    /**
+     * Get fully qualified topic name
+     * @param {string} topic - The topic
+     */
     get_fully_qualified_topic(topic) {
         if (topic[0] === '/')
             return topic;
@@ -141,28 +210,60 @@ class Rach {
             return this.ns + topic;
     }
 
+    /**
+     * Callback for addition of subscription callback and it's args
+     * @param {Rach} rach - The Rach client
+     * @param {string} topic - The subscription topic
+     * @param {function} callback - The subscription callback
+     * @param {list} args - The additional arguments to be passed to the subscription callback
+     */
     static add_callback(rach, topic, callback, args) {
         rach.callbacks[topic] = [callback, args];
         rach.sub_topics[topic] = true;
     }
 
+    /**
+     * Callback for removal of subscription callback and it's args
+     * @param {Rach} rach - The Rach client
+     * @param {string} topic - The subscription topic
+     */
     static rm_callback(rach, topic) {
         delete rach.callbacks[topic];
         delete rach.sub_topics[topic];
     }
 
+    /**
+     * Callback for approval of publicise
+     * @param {Rach} rach - The Rach client
+     * @param {string} topic - The publish topic
+     */
     static add_pub_callback(rach, topic) {
         rach.pub_topics[topic] = true;
     }
 
+    /**
+     * Callback for removal of publicise
+     * @param {Rach} rach - The Rach client
+     * @param {string} topic - The publish topic
+     */
     static rm_pub_callback(rach, topic) {
         delete rach.pub_topics[topic];
     }
 
+    /**
+     * Callback that does nothing
+     * @param {Rach} rach - The Rach client
+     */
     static empty_callback(rach) {
 
     }
 
+    /**
+     * Request to subscribe to a topic
+     * @param {string} topic - The subscription topic
+     * @param {function} callback - The callback to call when event occurs at <topic>
+     * @param {list} args - The arguments to pass to the callback in addition to data
+     */
     add_sub(topic, callback, args) {
         // Todo: Support for multiple sub requests
         topic = this.get_fully_qualified_topic(topic);
@@ -184,6 +285,10 @@ class Rach {
         this.send(msg);
     }
 
+    /**
+     * Request to remove a subscription to a topic
+     * @param {string} topic - The topic
+     */
     rm_sub(topic) {
         topic = this.get_fully_qualified_topic(topic);
         if (!(topic in this.sub_topics)) {
@@ -204,6 +309,10 @@ class Rach {
         this.send(msg);
     }
 
+    /**
+     * Request to publish to a topic
+     * @param {string} topic - The topic
+     */
     add_pub(topic) {
         topic = this.get_fully_qualified_topic(topic);
         if (topic in this.pub_topics) {
@@ -225,6 +334,10 @@ class Rach {
         return new Rach.Publisher(topic, this);
     }
 
+    /**
+     * Request to stop publishing to a topic
+     * @param {string} topic - The topic
+     */
     rm_pub(topic) {
         topic = this.get_fully_qualified_topic(topic);
         if (!(topic in this.pub_topics)) {
@@ -245,6 +358,11 @@ class Rach {
         this.send(msg);
     }
 
+    /**
+     * Request to publish to a topic
+     * @param {string} topic - The topic
+     * @param {object} data - The data to publish
+     */
     pub(topic, data) {
         topic = this.get_fully_qualified_topic(topic);
         if (!(topic in this.pub_topics)) {
@@ -263,6 +381,10 @@ class Rach {
         this.send(msg);
     }
 
+    /**
+     * Process data received from subscription
+     * @param {object} data - The data received
+     */
     process_pub(data) {
         if (data == null || data.topic == null) {
             return;
@@ -278,17 +400,34 @@ class Rach {
             cb.apply(null, [data].concat(args));
     }
 
+    /**
+     * Request removal of all subscription
+     */
     rm_all_sub() {
         for (let topic in this.sub_topics)
-            this.rm_sub(topic);
+            if (this.sub_topics.hasOwnProperty(topic))
+                this.rm_sub(topic);
     }
 
+    /**
+     * Request withdrawal of all publicise requests
+     */
     rm_all_pub() {
         for (let topic in this.pub_topics)
-            this.rm_pub(topic);
+            if (this.pub_topics.hasOwnProperty(topic))
+                this.rm_pub(topic);
     }
 
-    service_call(topic, args, on_result, on_err) {
+    /**
+     * Call a service
+     * @param {string} topic - The service topic
+     * @param {list} args - The service arguments
+     * @param {function} on_result - The callback to call when service call returns
+     * @param {list} on_result_args - The parameters to pass to on_result
+     * @param {function} on_err - The callback to call when service call throws exception
+     * @param {list} on_err_args - The parameters to pass to on_err
+     */
+    service_call(topic, args, on_result, on_result_args, on_err, on_err_args) {
         let matcher = this.make_req_matcher();
         let msg = {
             'type': 'service',
@@ -299,25 +438,36 @@ class Rach {
             }
         };
         this.request_map[matcher] = [
-            on_result, [], on_err, []
+            on_result, on_result_args, on_err, on_err_args
         ];
         this.send(msg);
     }
 }
 
+/** Class used to represent a publisher to a topic */
 Rach.Publisher = class {
+    /**
+     * Create a publisher
+     * @param {string} topic - The topic the publisher publishes at
+     * @param {Rach} rach - The Rach client to publish through
+     */
     constructor(topic, rach) {
         this.rach = rach;
         this.topic = topic;
     }
 
+    /**
+     * Publish data to Rach server
+     * @param {object} data - The data to publish
+     */
     pub(data) {
         this.rach.pub(this.topic, data);
     }
 
+    /**
+     * Destroy the publisher
+     */
     close() {
         this.rach.rm_pub(this.topic);
     }
 };
-
-module.exports = Rach;
