@@ -286,7 +286,6 @@ class RachServer {
         if (this.actions['authTest'](cred)) {
             let id = uuid_v1();
             let msg = {type: 'auth', verbose: 'Passed auth test', data: {success: true, id: id}};
-            this.logger.info(msg.verbose);
             let client = new RachClient(id, ws);
             client.send(JSON.stringify(msg), undefined);
             this.clients[id] = client;
@@ -296,6 +295,7 @@ class RachServer {
             ws.send(JSON.stringify(msg));
             ws.close();
         }
+        this.logStats();
     }
 
     /**
@@ -322,7 +322,8 @@ class RachServer {
      * @param {object} client - The Rach client
      */
     onClose(client) {
-
+        delete this.clients[client.id];
+        this.logStats();
     }
 
     /**
@@ -331,7 +332,8 @@ class RachServer {
      * @param {object} err - The error
      */
     onError(client, err) {
-
+        delete this.clients[client.id];
+        this.logStats();
     }
 
     /**
@@ -557,6 +559,10 @@ class RachServer {
                 }
             }
         });
+    }
+
+    logStats() {
+        this.logger.info(`${Object.keys(this.clients).length} clients connected.`);
     }
 }
 
