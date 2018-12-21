@@ -32,11 +32,16 @@ class Rach {
 
     /**
      * Connect to the Rach Server
+     * @param {function, optional} on_start - The callback to call when connection established
      */
-    start() {
+    start(on_start) {
         let path = Rach.prep_path(this.server_path, this.cred);
         this.sock = new WebSocket(path);
-        this.sock.onopen = (event) => this.ws_on_open(event);
+        this.sock.onopen = (event) => {
+            this.ws_on_open(event);
+            if (on_start)
+                on_start();
+        };
         this.sock.onmessage = (event) => this.ws_on_message(event);
         this.sock.onerror = (event) => this.ws_on_error(event);
         this.sock.onclose = (event) => this.ws_on_close(event);
@@ -46,7 +51,6 @@ class Rach {
      * Disconnect from the Rach Server
      */
     stop() {
-        this.killed = true;
         this.rm_all_sub();
         this.rm_all_pub();
         if (this.sock != null)
@@ -471,3 +475,5 @@ Rach.Publisher = class {
         this.rach.rm_pub(this.topic);
     }
 };
+
+module.exports = Rach;
