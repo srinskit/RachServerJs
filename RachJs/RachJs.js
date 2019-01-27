@@ -197,10 +197,11 @@ class Rach {
      * @param {string} ns - The namespace
      */
     set_namespace(ns) {
-        if (ns[ns.length - 1] !== '/')
-            this.ns = ns + '/';
-        else
-            this.ns = ns;
+        if (ns.length > 1 && ns[ns.length - 1] === '/')
+            ns = ns.substr(0, ns.length - 1)
+        if (ns[0] !== '/')
+            ns = '/' + ns;
+        this.ns = ns;
     }
 
     /**
@@ -208,10 +209,12 @@ class Rach {
      * @param {string} topic - The topic
      */
     get_fully_qualified_topic(topic) {
+        if (topic.length > 1 && topic[topic.length - 1] === '/')
+            topic = topic.substr(0, topic.length - 1)
         if (topic[0] === '/')
             return topic;
         else
-            return this.ns + topic;
+            return this.ns + (this.ns === '/' ? '' : '/') + topic;
     }
 
     /**

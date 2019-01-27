@@ -226,7 +226,7 @@ class RachClient {
     }
 }
 
-/** Class representing Rach server */
+/** Class representing Rach Server */
 class RachServer {
 
     /**
@@ -234,8 +234,10 @@ class RachServer {
      * @param {object} actions - The map mapping actions to callbacks
      * @param {object} services - The map mapping services to callbacks
      * @param {object} logger - The logger instance to be used for logging
+     * @param {Number, optional} port - The port Rach Server listens on
      */
-    constructor(actions, services, logger) {
+    constructor(actions, services, logger, port) {
+        this.port = port || 8080;
         this.actions = actions;
         this.services = services;
         this.logger = logger;
@@ -256,7 +258,7 @@ class RachServer {
      */
     start() {
         this.wss = new WebSocket.Server({
-            port: 8080
+            port: this.port,
         });
         this.wss.on('connection', (ws, req) => this.onConnectionCallback(ws, req));
         this.logger.info('Starting RachServer');
@@ -346,6 +348,7 @@ class RachServer {
         switch (req.type) {
             case 'service': {
                 if ('topic' in req.data && 'args' in req.data) {
+                    req.data.topic = RachServer.format_topic(req.data.topic);
                     if (req.data.topic in this.services) {
                         this.services[req.data.topic].apply(null, [this,
                             (err) => {
@@ -459,7 +462,8 @@ class RachServer {
                                 topic: topic
                             },
                         };
-                        this.clients[id].send(JSON.stringify(res));
+                        if (this.clients[id] != null)
+                            this.clients[id].send(JSON.stringify(res));
                     });
 
                 } else {
@@ -481,10 +485,10 @@ class RachServer {
      * @return {string} The fully-qualified form of given topic
      */
     static format_topic(topic) {
+        if (topic.length > 1 && topic[topic.length - 1] === '/')
+            topic = topic.substr(0, topic.length - 1);
         if (topic[0] !== '/')
             topic = '/' + topic;
-        if (topic[topic.length - 1] === '/')
-            topic = topic.substr(0, topic.length - 1);
         return topic;
     }
 
@@ -512,7 +516,7 @@ class RachServer {
 
     /**
      * Add a local publisher
-     * @param {string} topic - The topic to publicise tp
+     * @param {string} topic - The topic to publicise to
      */
     addPub(topic) {
 

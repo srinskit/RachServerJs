@@ -2,6 +2,7 @@ import json
 import websocket
 import time
 import threading
+from typing import Callable
 
 
 class Rach:
@@ -45,7 +46,7 @@ class Rach:
             """Publish data to Rach Server
 
             Parameters:
-                data (dict): The msg to publish
+                data (dict): The data to publish
             """
             self.rach.pub(self.topic, data)
 
@@ -94,13 +95,20 @@ class Rach:
         """
         return path + '?type=terminal&username=%s&password=%s' % (cred.get('username', ''), cred.get('password', ''))
 
-    def start(self):
+    def start(self, on_start=None):
         """Connect to the Rach Server
+
+        Parameters:
+              on_start (function): The callback to call when connection established
         """
         self.killed = False
         self.sock_manager_thread = threading.Thread(target=self.sock_manager)
         self.sock_manager_thread.start()
         # Todo: block till connect
+        time.sleep(1)
+        # Todo: implement on_start call. currently dummy for consistency with RachJs
+        if on_start is not None:
+            on_start()
 
     def stop(self):
         """Disconnect from the Rach Server
@@ -192,7 +200,7 @@ class Rach:
         """Process received message
 
         Parameters:
-              msg (dict): The received message in Rach Message Format
+              msg (dict): Process received message
         """
         typ = msg.get('type')
         matcher = msg.get('matcher', None)
@@ -241,6 +249,8 @@ class Rach:
     def make_req_matcher(self):
         """Generate unique string every call
 
+        Returns:
+            str: The unique string
         """
 
         self.matcher += 1
@@ -253,10 +263,11 @@ class Rach:
             ns (str): The namespace
         """
 
-        if ns[-1] != '/':
-            self.ns = ns + '/'
-        else:
-            self.ns = ns
+        if len(ns) > 1 and ns[-1] == '/':
+            ns = ns[:-1]
+        if ns[0] != '/':
+            ns = '/' + ns
+        self.ns = ns
 
     def get_fully_qualified_topic(self, topic):
         """Get fully qualified topic name
@@ -264,10 +275,11 @@ class Rach:
         Parameters:
             topic (str): The topic
         """
-
+        if len(topic) > 1 and topic[-1] == '/':
+            topic = topic[:-1]
         if topic[0] == '/':
             return topic
-        return self.ns + topic
+        return self.ns + ('' if self.ns == '' else '/') + topic
 
     def add_callback(self, topic, callback, args):
         """Callback for addition of subscription callback and it's args
@@ -416,10 +428,10 @@ class Rach:
 
         if data is None:
             return
-        cb: function = None
-        args: list = None
         try:
-            cb, args = self.callbacks.get(data.get('topic'), (None, None))
+            tmp = self.callbacks.get(data.get('topic'), (None, None))
+            cb: Callable = tmp[0]
+            args: list = tmp[1]
             cb(data, *args)
         except TypeError:
             self.log('Could not call callback')
