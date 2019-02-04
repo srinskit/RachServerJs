@@ -199,6 +199,7 @@ class RachClient {
     constructor(id, ws) {
         this.id = id;
         this.ws = ws;
+        this.public_id = this.id === '-1' ? "server" : uuid_v1();
         if (this.id === '-1')
             return;
         this.ws.on('message', (msg) => {
@@ -350,7 +351,7 @@ class RachServer {
                 if ('topic' in req.data && 'args' in req.data) {
                     req.data.topic = RachServer.format_topic(req.data.topic);
                     if (req.data.topic in this.services) {
-                        this.services[req.data.topic].apply(null, [this,
+                        this.services[req.data.topic].apply(null, [this, client,
                             (err) => {
                                 let res = {
                                     matcher: req.matcher,
@@ -459,7 +460,8 @@ class RachServer {
                             data: {
                                 data: req.data.data,
                                 source_topic: req.data.topic,
-                                topic: topic
+                                topic: topic,
+                                source: client.public_id,
                             },
                         };
                         if (this.clients[id] != null)
