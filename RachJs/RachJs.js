@@ -198,7 +198,7 @@ class Rach {
      */
     set_namespace(ns) {
         if (ns.length > 1 && ns[ns.length - 1] === '/')
-            ns = ns.substr(0, ns.length - 1)
+            ns = ns.substr(0, ns.length - 1);
         if (ns[0] !== '/')
             ns = '/' + ns;
         this.ns = ns;
@@ -210,7 +210,7 @@ class Rach {
      */
     get_fully_qualified_topic(topic) {
         if (topic.length > 1 && topic[topic.length - 1] === '/')
-            topic = topic.substr(0, topic.length - 1)
+            topic = topic.substr(0, topic.length - 1);
         if (topic[0] === '/')
             return topic;
         else
@@ -222,7 +222,7 @@ class Rach {
      * @param {Rach} rach - The Rach client
      * @param {string} topic - The subscription topic
      * @param {function} callback - The subscription callback
-     * @param {list} args - The additional arguments to be passed to the subscription callback
+     * @param {[]} args - The additional arguments to be passed to the subscription callback
      */
     static add_callback(rach, topic, callback, args) {
         rach.callbacks[topic] = [callback, args];
@@ -269,7 +269,7 @@ class Rach {
      * Request to subscribe to a topic
      * @param {string} topic - The subscription topic
      * @param {function} callback - The callback to call when event occurs at <topic>
-     * @param {list} args - The arguments to pass to the callback in addition to data
+     * @param {[]} args - The arguments to pass to the callback in addition to data
      */
     add_sub(topic, callback, args) {
         // Todo: Support for multiple sub requests
@@ -428,11 +428,11 @@ class Rach {
     /**
      * Call a service
      * @param {string} topic - The service topic
-     * @param {list} args - The service arguments
+     * @param {[]} args - The service arguments
      * @param {function} on_result - The callback to call when service call returns
-     * @param {list} on_result_args - The parameters to pass to on_result
+     * @param {[]} on_result_args - The parameters to pass to on_result
      * @param {function} on_err - The callback to call when service call throws exception
-     * @param {list} on_err_args - The parameters to pass to on_err
+     * @param {[]} on_err_args - The parameters to pass to on_err
      */
     service_call(topic, args, on_result, on_result_args, on_err, on_err_args) {
         let matcher = this.make_req_matcher();
