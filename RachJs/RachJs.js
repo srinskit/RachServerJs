@@ -18,6 +18,8 @@ class Rach {
         this.request_map = {};
         this.pub_topics = {};
         this.sub_topics = {};
+        this.killed = true;
+        this.on_start = null;
     }
 
     /**
@@ -35,13 +37,11 @@ class Rach {
      * @param {function, optional} on_start - The callback to call when connection established
      */
     start(on_start) {
+        this.killed = false;
+        this.on_start = on_start;
         let path = Rach.prep_path(this.server_path, this.cred);
         this.sock = new WebSocket(path);
-        this.sock.onopen = (event) => {
-            this.ws_on_open(event);
-            if (on_start)
-                on_start();
-        };
+        this.sock.onopen = (event) => this.ws_on_open(event);
         this.sock.onmessage = (event) => this.ws_on_message(event);
         this.sock.onerror = (event) => this.ws_on_error(event);
         this.sock.onclose = (event) => this.ws_on_close(event);
@@ -53,6 +53,7 @@ class Rach {
     stop() {
         this.rm_all_sub();
         this.rm_all_pub();
+        this.killed = true;
         if (this.sock != null)
             this.sock.close();
     }
@@ -72,6 +73,10 @@ class Rach {
      * @param {object} event - The websocket event
      */
     ws_on_open(event) {
+        if (this.on_start) {
+            this.on_start();
+            this.on_start = null;
+        }
         this.log('ws opened');
     }
 
@@ -104,6 +109,13 @@ class Rach {
      */
     ws_on_close(event) {
         this.log('ws closed');
+        if (this.killed !== true) {
+            setTimeout(() => {
+                this.log('reconnecting to ws server');
+                this.start(null);
+            }, 2000);
+
+        }
     }
 
     /**
@@ -179,6 +191,14 @@ class Rach {
                 } else {
                     cb.apply(null, args);
                 }
+            }
+        }
+        else if (typ === "ping") {
+            if (matcher != null && matcher in this.request_map) {
+                let tmp = this.request_map[matcher];
+                delete this.request_map[matcher];
+                let on_success = tmp[0];
+                on_success();
             }
         }
     }
@@ -448,6 +468,23 @@ class Rach {
             on_result, on_result_args, on_err, on_err_args
         ];
         this.send(msg);
+    }
+
+    /**
+     * Ping Rach Server
+     * @param {function} on_success - The callback to call on success
+     * @param {function} on_fail - The callback to call on failure
+     */
+    ping(on_success, on_fail) {
+        let matcher = this.make_req_matcher();
+        let msg = {
+            type: "ping",
+            matcher: matcher,
+        };
+        this.request_map[matcher] = [
+            on_success, [], on_fail, []
+        ];
+        this.send(msg, (e) => e != null ? on_fail() : null);
     }
 }
 
