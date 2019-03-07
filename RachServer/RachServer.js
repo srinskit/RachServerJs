@@ -223,6 +223,7 @@ class RachClient {
         try {
             this.ws.send(msg, callback);
         } catch (err) {
+            callback(err);
         }
     }
 }
@@ -472,6 +473,11 @@ class RachServer {
                     let res = {matcher: req.matcher, type: 'err', verbose: 'Publish failed'};
                     client.send(JSON.stringify(res), undefined);
                 }
+            }
+                break;
+            case 'cs_ping': {
+                let res = {matcher: req.matcher, type: 'cs_ping',};
+                client.send(JSON.stringify(res), undefined);
             }
                 break;
             default:

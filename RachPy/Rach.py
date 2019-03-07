@@ -67,6 +67,7 @@ class Rach:
         self.server_path = path
         self.debug = False
         self.killed = False
+        self.connected = False
         self.ns = '/'
         self.matcher = 0
         self.callbacks = {}
@@ -102,6 +103,7 @@ class Rach:
               on_start (function): The callback to call when connection established
         """
         self.killed = False
+        self.connected = False
         self.sock_manager_thread = threading.Thread(target=self.sock_manager)
         self.sock_manager_thread.start()
         # Todo: block till connect
@@ -121,18 +123,26 @@ class Rach:
         if self.sock_manager_thread is not None:
             self.sock_manager_thread.join()
 
-    def send(self, msg):
+    def send(self, msg, callback=None):
         """Send msg to Rach Server
 
         Parameters:
               msg (dict): The message to send
+              callback (function, optional): The callback to pass null to on success and not null on error
         """
         try:
             str_msg = json.dumps(msg)
             self.log('ws send msg: ' + str_msg)
-            self.sock.send(str_msg)
+            if self.connected:
+                self.sock.send(str_msg)
+            else:
+                callback(True) if callable(callback) else None
+                return
         except json.decoder.JSONDecodeError:
             self.log('ws msg encode error: ' + str(msg))
+            callback(True) if callable(callback) else None
+            return
+        callback(None) if callable(callback) else None
 
     def ws_on_open(self, _):
         """Callback to handle websocket connection open
@@ -141,6 +151,7 @@ class Rach:
               _ (websocket.WebSocketApp): The websocket client
         """
         self.log('ws opened')
+        self.connected = True
 
     def ws_on_message(self, _, str_msg):
         """Callback to handle message from websocket
@@ -172,6 +183,7 @@ class Rach:
               _ (websocket.WebSocketApp): The websocket client
         """
         self.log('ws closed')
+        self.connected = False
 
     def log(self, msg):
         """Print debug messages
@@ -233,6 +245,11 @@ class Rach:
                     cb(*([data] + args))
                 else:
                     cb(*args)
+        elif typ == "cs_ping":
+            if matcher is not None and matcher in self.request_map:
+                on_success, _, _, _ = self.request_map.pop(matcher)
+                if callable(on_success):
+                    on_success()
 
     def sock_manager(self):
         """Maintain socket connection
@@ -244,7 +261,7 @@ class Rach:
             self.sock.run_forever()
             # Reaches here when on disconnect
             if not self.killed:
-                time.sleep(1)
+                time.sleep(2)
 
     def make_req_matcher(self):
         """Generate unique string every call
@@ -475,3 +492,21 @@ class Rach:
             on_result, on_result_args, on_err, on_err_args
         ]
         self.send(msg)
+
+    def ping(self, on_success=None, on_fail=None):
+        """Ping Rach Server
+
+            Parameters:
+                on_success (function, optional): The callback to call on success
+                on_fail (function, optional): The callback to call on failure
+        """
+        matcher = self.make_req_matcher()
+        msg = {
+            'type': 'cs_ping',
+            'matcher': matcher,
+            'data': None,
+        }
+        self.request_map[matcher] = [
+            on_success, None, on_fail, None
+        ]
+        self.send(msg, lambda e: on_fail(e) if e is not None else None)

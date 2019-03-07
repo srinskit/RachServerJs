@@ -19,6 +19,7 @@ class Rach {
         this.pub_topics = {};
         this.sub_topics = {};
         this.killed = true;
+        this.connected = false;
         this.on_start = null;
     }
 
@@ -38,6 +39,7 @@ class Rach {
      */
     start(on_start) {
         this.killed = false;
+        this.connected = false;
         this.on_start = on_start;
         let path = Rach.prep_path(this.server_path, this.cred);
         this.sock = new WebSocket(path);
@@ -61,11 +63,23 @@ class Rach {
     /**
      * Send msg to Rach Server
      * @param {object} msg - The message to send
+     * @param {function} callback - The callback to pass null to on success and not null on error
      */
-    send(msg) {
+    send(msg, callback) {
         let str_msg = JSON.stringify(msg);
         this.log('ws send msg: ' + str_msg);
-        this.sock.send(str_msg);
+        if (this.connected) {
+            try {
+                this.sock.send(str_msg);
+            }
+            catch (e) {
+                callback != null ? callback(e) : null;
+                return;
+            }
+            callback != null ? callback(null) : null;
+            return;
+        }
+        callback != null ? callback(true) : null;
     }
 
     /**
@@ -77,6 +91,7 @@ class Rach {
             this.on_start();
             this.on_start = null;
         }
+        this.connected = true;
         this.log('ws opened');
     }
 
@@ -109,6 +124,7 @@ class Rach {
      */
     ws_on_close(event) {
         this.log('ws closed');
+        this.connected = false;
         if (this.killed !== true) {
             setTimeout(() => {
                 this.log('reconnecting to ws server');
@@ -193,12 +209,13 @@ class Rach {
                 }
             }
         }
-        else if (typ === "ping") {
+        else if (typ === "cs_ping") {
             if (matcher != null && matcher in this.request_map) {
                 let tmp = this.request_map[matcher];
                 delete this.request_map[matcher];
                 let on_success = tmp[0];
-                on_success();
+                if (on_success != null)
+                    on_success();
             }
         }
     }
@@ -478,13 +495,14 @@ class Rach {
     ping(on_success, on_fail) {
         let matcher = this.make_req_matcher();
         let msg = {
-            type: "ping",
+            type: "cs_ping",
             matcher: matcher,
+            data: null,
         };
         this.request_map[matcher] = [
-            on_success, [], on_fail, []
+            on_success, null, on_fail, null
         ];
-        this.send(msg, (e) => e != null ? on_fail() : null);
+        this.send(msg, (e) => (e != null && on_fail != null) ? on_fail(e) : null);
     }
 }
 
