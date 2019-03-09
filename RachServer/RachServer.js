@@ -200,18 +200,41 @@ class RachClient {
         this.id = id;
         this.ws = ws;
         this.public_id = this.id === '-1' ? "server" : uuid_v1();
+        this.last_seen = null;
         if (this.id === '-1')
             return;
         this.ws.on('message', (msg) => {
             RachClient.actions['onMessage'](this, msg);
         });
         this.ws.on('close', () => {
+            this.last_seen = new Date() / 1000;
             RachClient.actions['onClose'](this);
         });
         this.ws.on('error', (err) => {
             RachClient.actions['onError'](this, err);
         });
     }
+
+    /**
+     * Reconnect to RachClient with new websocket connection
+     * @param {object} ws - Websocket used to connect to client
+     */
+    reconnect(ws) {
+        this.ws.close();
+        this.ws = ws;
+        this.last_seen = null;
+        this.ws.on('message', (msg) => {
+            RachClient.actions['onMessage'](this, msg);
+        });
+        this.ws.on('close', () => {
+            this.last_seen = new Date() / 1000;
+            RachClient.actions['onClose'](this);
+        });
+        this.ws.on('error', (err) => {
+            RachClient.actions['onError'](this, err);
+        });
+    }
+
 
     /**
      * Send a message to the Rach client
@@ -287,12 +310,22 @@ class RachServer {
         }
         let cred = Url.parse(req.url, true).query;
         cred['ip'] = getIP(req);
+        cred["reconnecting"] = cred["reconnecting"] || false;
         if (this.actions['authTest'](cred)) {
-            let id = uuid_v1();
-            let msg = {type: 'auth', verbose: 'Passed auth test', data: {success: true, id: id}};
-            let client = new RachClient(id, ws);
-            client.send(JSON.stringify(msg), undefined);
-            this.clients[id] = client;
+            if (cred["reconnecting"] === false || this.clients[cred["private_id"]] == null) {
+                // Todo: generate better private ID
+                let id = uuid_v1();
+                let msg = {type: "auth", verbose: "Passed auth test", data: {success: true, id: id}};
+                let client = new RachClient(id, ws);
+                client.send(JSON.stringify(msg), undefined);
+                this.clients[id] = client;
+            } else {
+                let id = cred["private_id"];
+                let msg = {type: "auth", verbose: "Passed auth test", data: {success: true, id: id}};
+                let client = this.clients[id];
+                client.reconnect(ws);
+                client.send(JSON.stringify(msg), undefined);
+            }
         } else {
             let msg = {type: 'auth', verbose: 'Failed auth test', data: {success: false}};
             this.logger.warn(msg.verbose);

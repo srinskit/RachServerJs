@@ -10,6 +10,7 @@ class Rach {
     constructor(path, cred) {
         this.sock = null;
         this.cred = cred;
+        this.private_id = null;
         this.server_path = path;
         this.debug = false;
         this.ns = '/';
@@ -30,7 +31,10 @@ class Rach {
      * @return {string} The parameterized path to Rach Server
      */
     static prep_path(path, cred) {
-        return path + `?type=${cred['type']}&username=${cred['username']}&password=${cred['password']}`;
+        let ret = path + `?username=${cred["username"]}&password=${cred["password"]}`;
+        if (cred["reconnecting"] === "true" && cred["private_id"] != null)
+            ret += `&reconnecting=true&private_id=${cred["private_id"]}`;
+        return ret;
     }
 
     /**
@@ -42,6 +46,22 @@ class Rach {
         this.connected = false;
         this.on_start = on_start;
         let path = Rach.prep_path(this.server_path, this.cred);
+        this.sock = new WebSocket(path);
+        this.sock.onopen = (event) => this.ws_on_open(event);
+        this.sock.onmessage = (event) => this.ws_on_message(event);
+        this.sock.onerror = (event) => this.ws_on_error(event);
+        this.sock.onclose = (event) => this.ws_on_close(event);
+    }
+
+
+    /**
+     * Reconnect to the Rach Server
+     */
+    reconnect() {
+        this.connected = false;
+        let cred = { reconnecting: "true", private_id: this.private_id };
+        Object.assign(cred, this.cred);
+        let path = Rach.prep_path(this.server_path, cred);
         this.sock = new WebSocket(path);
         this.sock.onopen = (event) => this.ws_on_open(event);
         this.sock.onmessage = (event) => this.ws_on_message(event);
@@ -127,8 +147,10 @@ class Rach {
         this.connected = false;
         if (this.killed !== true) {
             setTimeout(() => {
-                this.log('reconnecting to ws server');
-                this.start(null);
+                if (this.killed !== true) {
+                    this.log('reconnecting to ws server');
+                    this.reconnect();
+                }
             }, 2000);
 
         }
@@ -172,6 +194,8 @@ class Rach {
         if (typ === 'auth') {
             if (!((msg.data || {}).success || false))
                 this.stop();
+            else
+                this.private_id = msg.data.id;
         } else if (typ === 'err') {
             if (matcher != null && matcher in this.request_map) {
                 let tmp = this.request_map[matcher];

@@ -64,6 +64,7 @@ class Rach:
         self.sock: websocket.WebSocketApp = None
         self.sock_manager_thread: threading.Thread = None
         self.cred = cred
+        self.private_id = None
         self.server_path = path
         self.debug = False
         self.killed = False
@@ -74,14 +75,7 @@ class Rach:
         self.request_map = {}
         self.pub_topics = {}
         self.sub_topics = {}
-        # Todo: Why non-lambda not work how-does-python-distinguish-callback-function-which-is-a-member-of-a-class
-        path = Rach.prep_path(self.server_path, self.cred)
-        # Note: the closure context of lambda allows us to use <self> inside lambda
-        self.sock = websocket.WebSocketApp(path,
-                                           on_open=lambda ws: self.ws_on_open(ws),
-                                           on_message=lambda ws, msg: self.ws_on_message(ws, msg),
-                                           on_error=lambda ws, error: self.ws_on_error(ws, error),
-                                           on_close=lambda ws: self.ws_on_close(ws))
+        self.sock = None
 
     @staticmethod
     def prep_path(path, cred):
@@ -94,7 +88,10 @@ class Rach:
         Returns:
             str: The parameterized path to Rach Server
         """
-        return path + '?type=terminal&username=%s&password=%s' % (cred.get('username', ''), cred.get('password', ''))
+        ret = path + "?username=%s&password=%s" % (cred.get("username", ""), cred.get("password", ""))
+        if "reconnecting" in cred and cred["reconnecting"] == "true" and "private_id" in cred:
+            ret += "&reconnecting=true&private_id=%s" % cred["private_id"]
+        return ret
 
     def start(self, on_start=None):
         """Connect to the Rach Server
@@ -111,6 +108,11 @@ class Rach:
         # Todo: implement on_start call. currently dummy for consistency with RachJs
         if on_start is not None:
             on_start()
+
+    def reconnect(self):
+        """Reconnect to the Rach Server
+        """
+        self.connected = False
 
     def stop(self):
         """Disconnect from the Rach Server
@@ -255,13 +257,24 @@ class Rach:
         """Maintain socket connection
 
         """
-
+        cred = self.cred
         while not self.killed:
+            path = Rach.prep_path(self.server_path, cred)
+            if self.sock is not None:
+                self.sock.close()
+            self.sock = websocket.WebSocketApp(path,
+                                               on_open=lambda ws: self.ws_on_open(ws),
+                                               on_message=lambda ws, msg: self.ws_on_message(ws, msg),
+                                               on_error=lambda ws, error: self.ws_on_error(ws, error),
+                                               on_close=lambda ws: self.ws_on_close(ws))
             # Attempt connect
+            self.connected = True
             self.sock.run_forever()
+            self.connected = False
             # Reaches here when on disconnect
             if not self.killed:
                 time.sleep(2)
+                cred = {"reconnecting": "true", "private_id": self.private_id, **self.cred}
 
     def make_req_matcher(self):
         """Generate unique string every call
