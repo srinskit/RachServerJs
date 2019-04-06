@@ -61,8 +61,10 @@ class Rach:
             path (str): The URL of Rach Server
             cred (dict): The credentials used for authentication
         """
-        self.sock: websocket.WebSocketApp = None
-        self.sock_manager_thread: threading.Thread = None
+        # self.sock: websocket.WebSocketApp = None
+        self.sock = None
+        # self.sock_manager_thread: threading.Thread = None
+        self.sock_manager_thread = None
         self.cred = cred
         self.private_id = None
         self.server_path = path
@@ -460,8 +462,10 @@ class Rach:
             return
         try:
             tmp = self.callbacks.get(data.get('topic'), (None, None))
-            cb: Callable = tmp[0]
-            args: list = tmp[1]
+            # cb: Callable = tmp[0]
+            # args: list = tmp[1]
+            cb = tmp[0]
+            args = tmp[1]
             cb(data, *args)
         except TypeError:
             self.log('Could not call callback')
