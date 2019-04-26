@@ -1,5 +1,3 @@
-/** @module RachServer */
-
 const WebSocket = require('ws');
 const Url = require('url');
 const uuid_v1 = require('uuid/v1');
@@ -262,7 +260,6 @@ class RachServer {
      * @param {Number, optional} port - The port Rach Server listens on
      */
     constructor(actions, services, logger, port) {
-        this.port = port || 8080;
         this.actions = actions;
         this.services = services;
         this.logger = logger;
