@@ -260,6 +260,7 @@ class RachServer {
      * @param {Number, optional} port - The port Rach Server listens on
      */
     constructor(actions, services, logger, port) {
+        this.port = port;
         this.actions = actions;
         this.services = services;
         this.logger = logger;
