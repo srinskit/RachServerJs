@@ -1,4 +1,7 @@
 # Rach Server
+
+[![NPM](https://nodei.co/npm/rach-server.png)](https://nodei.co/npm/rach-server/)
+
 ## Install from NPM
 ```
 npm install rach-server
